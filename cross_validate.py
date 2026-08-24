@@ -1,9 +1,42 @@
 #!/usr/bin/env python3
-"""Cross-validate our TCP-AO implementation against cdleonard/tcp-authopt-test."""
+"""Cross-validate our TCP-AO implementation against cdleonard/tcp-authopt-test.
 
+Usage:
+    # Clone the reference implementation next to this repo (or anywhere):
+    git clone https://github.com/cdleonard/tcp-authopt-test.git /path/to/tcp-authopt-test
+
+    # Run with the path:
+    python3 cross_validate.py /path/to/tcp-authopt-test
+
+    # Or, if cloned as a sibling directory:
+    python3 cross_validate.py
+"""
+
+import os
 import sys
-sys.path.insert(0, '/garage/reji.thomas/tcp-authopt-test')
-sys.path.insert(0, '/garage/reji.thomas/tcp_ao_algs')
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Reference impl path: first arg, or sibling directory, or environment variable
+ref_path = None
+if len(sys.argv) > 1:
+    ref_path = sys.argv[1]
+elif os.environ.get('TCP_AUTHOPT_TEST_PATH'):
+    ref_path = os.environ['TCP_AUTHOPT_TEST_PATH']
+else:
+    candidate = os.path.join(os.path.dirname(script_dir), 'tcp-authopt-test')
+    if os.path.isdir(candidate):
+        ref_path = candidate
+
+if ref_path is None or not os.path.isdir(ref_path):
+    print("Error: cannot find tcp-authopt-test reference implementation.")
+    print("Provide the path as an argument or clone it as a sibling directory:")
+    print("  git clone https://github.com/cdleonard/tcp-authopt-test.git")
+    print("  python3 cross_validate.py /path/to/tcp-authopt-test")
+    sys.exit(1)
+
+sys.path.insert(0, ref_path)
+sys.path.insert(0, script_dir)
 
 from ipaddress import IPv4Address, IPv6Address
 from scapy.layers.inet import IP, TCP

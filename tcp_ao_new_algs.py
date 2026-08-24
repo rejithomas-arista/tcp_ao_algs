@@ -12,6 +12,7 @@ Validates against RFC 9235 known-good test vectors, then generates
 
 import hmac
 import hashlib
+import os
 import struct
 import json
 import sys
@@ -1713,7 +1714,7 @@ if __name__ == '__main__':
         'openssl_version': ossl_ver.stdout.strip(),
         'vectors': all_vectors,
     }
-    json_path = '/garage/reji.thomas/tcp_ao_algs/tcp_ao_test_vectors.json'
+    json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tcp_ao_test_vectors.json')
     with open(json_path, 'w') as f:
         json.dump(output, f, indent=2)
     print(f"\nJSON output: {json_path}")
