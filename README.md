@@ -48,11 +48,14 @@ This runs the full pipeline:
 5. RFC-formatted output of the conformant (256-bit key) vectors
 6. JSON output to `tcp_ao_test_vectors.json`
 
-## Cross-validation against reference implementation
+## Cross-validation against reference implementation (RFC 9235)
 
-To cross-validate against
-[cdleonard/tcp-authopt-test](https://github.com/cdleonard/tcp-authopt-test),
-clone it as a sibling directory:
+The new algorithms reuse the same KDF context construction (RFC 5925 §5.2) and
+MAC message assembly (RFC 5925 §5.1) as the existing algorithms. To verify this
+shared framework is correct, `cross_validate.py` compares our implementation
+against [cdleonard/tcp-authopt-test](https://github.com/cdleonard/tcp-authopt-test)
+on all 32 RFC 9235 test vectors, checking KDF context bytes, traffic keys,
+MAC message bytes, and MAC outputs.
 
 ```
 cd ..
@@ -66,9 +69,6 @@ Or pass the path explicitly:
 ```
 python3 cross_validate.py /path/to/tcp-authopt-test
 ```
-
-This compares KDF context bytes, traffic keys, MAC message bytes, and MAC
-outputs for all 32 RFC 9235 test vectors between both implementations.
 
 ## Files
 
