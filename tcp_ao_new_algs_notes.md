@@ -80,12 +80,6 @@ The 80-bit key is **nonconformant** with the draft's own normative requirement.
 - 32 provisional vectors using "testvector" (80-bit, for RFC 9235 continuity)
 - 32 candidate conformant vectors using "testvector-256-bit-key-tcp-ao!!!" (32 bytes ASCII)
 
-The WG must decide whether to (a) exempt test vectors from the MUST, or (b) adopt
-a 256-bit key for the appendix.
-
-> **Also raised by reviewer** (Section A.1 comment): reviewer independently flagged
-> the same conflict and recommends defining a new master key.
-
 ### 2.3 KMAC256-128 truncation wording is misleading
 
 **Draft §3.2**: "All MACs are truncated to 128 bits."
@@ -98,16 +92,10 @@ length L into its sponge padding:
 KMAC256(..., L=128) ≠ KMAC256(..., L=256)[:16]
 ```
 
-We confirmed this empirically: the two outputs are cryptographically unrelated.
-
 **Suggested replacement**:
 > - HMAC-SHA256-128: Compute HMAC-SHA256 and take the leftmost 128 bits.
 > - KMAC256-128: Request exactly 128 output bits from KMAC256 with an empty
 >   customization string. Do not compute a longer output and truncate.
-
-> **Partially raised by reviewer** (Section 3.2 comment): reviewer asked whether
-> truncation is left or right. Our finding goes further — for KMAC256, truncation
-> is the wrong mental model entirely.
 
 ### 2.4 Incorrect HKDF reference (SP 800-185)
 
@@ -141,9 +129,6 @@ Traffic_Key = KMAC256(
 
 Note: Master_Key appears in the KMAC *message*, not as the KMAC *key*. The all-zero
 salt serves as the KMAC key. This follows SP 800-56Cr2 Option 3 exactly.
-
-> **Partially raised by reviewer** (Section 3.1.2 comment): reviewer flagged the
-> 5-vs-4 parameter mismatch but did not identify the two-layer structure.
 
 ### 2.6 NIST KMAC test vector reference
 
@@ -185,4 +170,4 @@ document for implementor validation.
 - pycryptodome 3.23.0
 - scapy 2.7.0
 - OpenSSL 3.2.2
-- Reference impl: cdleonard/tcp-authopt-test (cloned to /garage/reji.thomas/tcp-authopt-test)
+- Reference impl: cdleonard/tcp-authopt-test
