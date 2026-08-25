@@ -2,12 +2,12 @@
 """
 TCP-AO New Algorithms: Implementation & Test Vector Generation
 
-Implements draft-ietf-tcpm-tcp-ao-algs-06:
+Implements draft-ietf-tcpm-tcp-ao-algs-07:
   - HMAC-SHA256-128 with HKDF-SHA256 KDF
   - KMAC256-128 with KMAC256-KDF (SP 800-56Cr2)
 
-Validates against RFC 9235 known-good test vectors, then generates
-64 new test vectors (32 provisional + 32 conformant).
+Validates against RFC 9235 known-good test vectors, then generates the
+32 test vectors required by the draft.
 """
 
 import hmac
@@ -25,8 +25,11 @@ from Crypto.Cipher import AES
 # Constants
 # ---------------------------------------------------------------------------
 
-MASTER_KEY_80 = b"testvector"                          # RFC 9235, 80 bits
-MASTER_KEY_256 = b"testvector-256-bit-key-tcp-ao!!!"   # 256 bits, conformant
+RFC9235_MASTER_KEY = b"testvector"
+DRAFT_MASTER_KEY = bytes.fromhex(
+    "0123456789abcdef0123456789abcdef"
+    "0123456789abcdef0123456789abcdef"
+)
 
 CLIENT_IPV4 = bytes([10, 11, 12, 13])
 SERVER_IPV4 = bytes([172, 27, 28, 29])
@@ -255,7 +258,7 @@ def mac_aes_128_cmac_96(traffic_key, message):
     return c.digest()[:12]
 
 # ---------------------------------------------------------------------------
-# New KDFs (draft-ietf-tcpm-tcp-ao-algs-06)
+# New KDFs (draft-ietf-tcpm-tcp-ao-algs-07)
 # ---------------------------------------------------------------------------
 
 def kdf_hkdf_sha256(master_key, context):
@@ -274,7 +277,7 @@ def kdf_kmac256(master_key, context):
     return k.digest()
 
 # ---------------------------------------------------------------------------
-# New MACs (draft-ietf-tcpm-tcp-ao-algs-06)
+# New MACs (draft-ietf-tcpm-tcp-ao-algs-07)
 # ---------------------------------------------------------------------------
 
 def mac_hmac_sha256_128(traffic_key, message):
@@ -951,7 +954,7 @@ def validate_rfc9235():
             client_port = tcp_info['src_port'] if pkt_info['key_type'].startswith('send') else tcp_info['dst_port']
 
             # Derive traffic key
-            tk, ctx = derive_traffic_key(kdf_fn, kdf_bits, MASTER_KEY_80, ip_ver,
+            tk, ctx = derive_traffic_key(kdf_fn, kdf_bits, RFC9235_MASTER_KEY, ip_ver,
                                          client_port,
                                          pkt_info['client_isn'],
                                          pkt_info['server_isn'],
@@ -1143,8 +1146,8 @@ SOURCE_PACKETS = {
 }
 
 
-def generate_new_vectors(master_key, master_key_label):
-    """Generate 32 test vectors for one master key variant."""
+def generate_new_vectors(master_key):
+    """Generate the draft's 32 test vectors."""
     results = []
     ip_labels = {'ipv4': 4, 'ipv6': 6}
 
@@ -1240,7 +1243,6 @@ def generate_new_vectors(master_key, master_key_label):
                     option_mode = 'covers' if covers else 'omits'
                     results.append({
                         'section': section,
-                        'master_key_variant': master_key_label,
                         'master_key_hex': master_key.hex(),
                         'ip_version': ip_ver,
                         'algorithm': alg['name'],
@@ -1309,7 +1311,7 @@ def verify_vectors(vectors):
 
         if client_send_tk != server_recv_tk:
             print(f"  FAIL: Client Send_other != Server Recv_other for "
-                  f"{v['algorithm']}/{v['option_mode']}/{v['master_key_variant']}")
+                  f"{v['algorithm']}/{v['option_mode']}")
             print(f"    Client send: {client_send_tk}")
             print(f"    Server recv: {server_recv_tk}")
             dir_ok = False
@@ -1320,7 +1322,6 @@ def verify_vectors(vectors):
         # Find the matching recv_other vector
         for v2 in vectors:
             if (v2['key_type'] == 'recv_other' and
-                v2['master_key_variant'] == v['master_key_variant'] and
                 v2['ip_version'] == v['ip_version'] and
                 v2['algorithm'] == v['algorithm'] and
                 v2['option_mode'] == v['option_mode'] and
@@ -1339,7 +1340,7 @@ def verify_vectors(vectors):
                 server_send_tk = alg_entry['kdf'](mk, server_send_ctx).hex()
                 if client_recv_tk != server_send_tk:
                     print(f"  FAIL: Server Send_other != Client Recv_other for "
-                          f"{v['algorithm']}/{v['option_mode']}/{v['master_key_variant']}")
+                          f"{v['algorithm']}/{v['option_mode']}")
                     dir_ok = False
                     all_ok = False
                 dir_checked += 1
@@ -1505,30 +1506,29 @@ def verify_vectors(vectors):
 
     # 7.8 Matrix enforcement
     print("\n--- Matrix Enforcement ---")
-    expected_variants = {'testvector', 'testvector-256-bit'}
     expected_count = 2 * 2 * 2 * 4  # ip_versions * algorithms * option_modes * packet_types
+    expected_master_key = DRAFT_MASTER_KEY.hex()
 
-    per_variant = {}
+    master_keys = {v['master_key_hex'] for v in vectors}
+    if master_keys != {expected_master_key}:
+        print(f"  FAIL: unexpected Master_Key value(s): {sorted(master_keys)}")
+        all_ok = False
+    else:
+        print("  Draft-07 Master_Key used by all vectors")
+
+    tuples = set()
     for v in vectors:
         t = (v['ip_version'], v['algorithm'], v['option_mode'], v['packet_type'])
-        per_variant.setdefault(v['master_key_variant'], set()).add(t)
+        tuples.add(t)
 
-    found_variants = set(per_variant.keys())
-    if found_variants != expected_variants:
-        missing = expected_variants - found_variants
-        print(f"  FAIL: missing master-key variant(s): {missing}")
+    if len(tuples) != expected_count:
+        print(f"  FAIL: {len(tuples)} unique tuples, expected {expected_count}")
         all_ok = False
-    for variant in sorted(expected_variants):
-        tset = per_variant.get(variant, set())
-        if len(tset) != expected_count:
-            print(f"  FAIL: {variant} has {len(tset)} vectors, expected {expected_count}")
-            all_ok = False
-        else:
-            print(f"  {variant}: {len(tset)} unique tuples OK")
+    else:
+        print(f"  {len(tuples)} unique tuples OK")
 
-    total_expected = len(expected_variants) * expected_count
-    if len(vectors) != total_expected:
-        print(f"  FAIL: total vectors {len(vectors)}, expected {total_expected}")
+    if len(vectors) != expected_count:
+        print(f"  FAIL: total vectors {len(vectors)}, expected {expected_count}")
         all_ok = False
     else:
         print(f"  Total: {len(vectors)} vectors OK")
@@ -1548,7 +1548,7 @@ def print_rfc_format(vectors):
 
     current_section = None
     for v in vectors:
-        section = f"IPv{v['ip_version']} {v['algorithm']} ({'Covers' if v['option_mode']=='covers' else 'Omits'} Options) [{v['master_key_variant']}]"
+        section = f"IPv{v['ip_version']} {v['algorithm']} ({'Covers' if v['option_mode']=='covers' else 'Omits'} Options)"
         if section != current_section:
             print(f"\n{'─' * 60}")
             print(f"  {section}")
@@ -1658,10 +1658,10 @@ if __name__ == '__main__':
     # OpenSSL HKDF cross-check with a real TCP-AO context
     _ctx = build_kdf_context(CLIENT_IPV4, SERVER_IPV4, 0xe9d7, SERVER_PORT,
                              0xfbfbab5a, 0)
-    _our_tk = kdf_hkdf_sha256(MASTER_KEY_80, _ctx)
+    _our_tk = kdf_hkdf_sha256(DRAFT_MASTER_KEY, _ctx)
     _ossl_cmd = (f'openssl kdf -keylen 32 -kdfopt digest:SHA256 '
                  f'-kdfopt mode:EXTRACT_AND_EXPAND '
-                 f'-kdfopt hexkey:{MASTER_KEY_80.hex()} '
+                 f'-kdfopt hexkey:{DRAFT_MASTER_KEY.hex()} '
                  f'-kdfopt hexsalt:{"00"*32} '
                  f'-kdfopt hexinfo:{_ctx.hex()} HKDF')
     _ossl_r = subprocess.run(_ossl_cmd, shell=True, capture_output=True, text=True)
@@ -1689,37 +1689,52 @@ if __name__ == '__main__':
     print("Generating New Test Vectors")
     print("=" * 70)
 
-    vectors_provisional = generate_new_vectors(MASTER_KEY_80, 'testvector')
-    print(f"  Generated {len(vectors_provisional)} provisional vectors (80-bit key)")
-
-    vectors_conformant = generate_new_vectors(MASTER_KEY_256, 'testvector-256-bit')
-    print(f"  Generated {len(vectors_conformant)} conformant vectors (256-bit key)")
-
-    all_vectors = vectors_provisional + vectors_conformant
+    vectors = generate_new_vectors(DRAFT_MASTER_KEY)
+    print(f"  Generated {len(vectors)} vectors using the draft-07 Master_Key")
 
     # Verify
-    ok = verify_vectors(all_vectors)
+    ok = verify_vectors(vectors)
 
-    # Print RFC format — conformant (256-bit) vectors only
-    print_rfc_format(vectors_conformant)
+    print_rfc_format(vectors)
 
     # Write JSON
     ossl_ver = subprocess.run(['openssl', 'version'], capture_output=True, text=True)
     output = {
         'generator': 'tcp_ao_new_algs.py',
-        'draft': 'draft-ietf-tcpm-tcp-ao-algs-06',
+        'draft': 'draft-ietf-tcpm-tcp-ao-algs-07',
+        'master_key_hex': DRAFT_MASTER_KEY.hex(),
         'python_version': sys.version.split()[0],
         'pycryptodome_version': Crypto.__version__,
         'scapy_version': scapy.__version__,
         'openssl_version': ossl_ver.stdout.strip(),
-        'vectors': all_vectors,
+        'vectors': vectors,
     }
     json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tcp_ao_test_vectors.json')
     with open(json_path, 'w') as f:
         json.dump(output, f, indent=2)
-    print(f"\nJSON output: {json_path}")
+
+    draft_output = {
+        'draft': 'draft-ietf-tcpm-tcp-ao-algs-07',
+        'master_key_hex': DRAFT_MASTER_KEY.hex(),
+        'vectors': [
+            {
+                'section': v['section'],
+                'traffic_key': v['traffic_key'],
+                'packet_hex': v['packet_hex'],
+                'mac': v['mac'],
+            }
+            for v in vectors
+        ],
+    }
+    draft_json_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'tcp_ao_draft_vectors.json')
+    with open(draft_json_path, 'w') as f:
+        json.dump(draft_output, f, indent=2)
+    print(f"\nValidation JSON output: {json_path}")
+    print(f"Draft JSON output: {draft_json_path}")
 
     if not ok:
         print("\nVerification FAILED.")
         sys.exit(1)
-    print(f"\nAll {len(all_vectors)} vectors generated and verified.")
+    print(f"\nAll {len(vectors)} vectors generated and verified.")

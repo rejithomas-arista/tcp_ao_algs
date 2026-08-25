@@ -74,9 +74,10 @@ This catches any divergence between the generation path and the packet bytes.
 
 ## 8. Matrix Enforcement
 
-Programmatic assertion that exactly 64 vectors exist:
-- 2 master-key variants (`testvector`, `testvector-256-bit`) must both be present
-- 32 unique parameter tuples per variant:
+Programmatic assertion that exactly 32 vectors exist using the Master_Key from
+draft-ietf-tcpm-tcp-ao-algs-07:
+- Every vector must contain the draft's exact Master_Key
+- 32 unique parameter tuples:
   2 IP versions × 2 algorithms × 2 option modes × 4 packet types
 - No duplicates, no gaps
 
@@ -88,6 +89,7 @@ All results are reproducible with pinned versions emitted at the top of every ru
 - scapy 2.7.0
 - OpenSSL 3.2.2
 
-Machine-readable output (`tcp_ao_test_vectors.json`) includes all intermediate
-values (PRK, KDF inputs, MAC message bytes with field boundaries) for
-cross-implementation debugging.
+`tcp_ao_test_vectors.json` includes all intermediate values (PRK, KDF inputs,
+MAC message bytes with field boundaries) for cross-implementation debugging.
+`tcp_ao_draft_vectors.json` contains only the Traffic_Key, final packet, and MAC
+outputs required for Appendix A.

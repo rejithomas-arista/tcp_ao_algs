@@ -1,7 +1,7 @@
 # TCP-AO New Algorithms: Test Vector Generator
 
 Implementation and test vector generation for
-[draft-ietf-tcpm-tcp-ao-algs-06](https://datatracker.ietf.org/doc/draft-ietf-tcpm-tcp-ao-algs/),
+[draft-ietf-tcpm-tcp-ao-algs-07](https://datatracker.ietf.org/doc/draft-ietf-tcpm-tcp-ao-algs/),
 which adds two new MAC/KDF algorithm pairs to TCP Authentication Option
 ([RFC 5925](https://www.rfc-editor.org/rfc/rfc5925)):
 
@@ -12,12 +12,13 @@ which adds two new MAC/KDF algorithm pairs to TCP Authentication Option
 
 ## What this produces
 
-- **64 test vectors** (32 provisional with RFC 9235's 80-bit key + 32 conformant
-  with a 256-bit key), covering IPv4/IPv6, covers/omits options, and all four
+- **32 test vectors** using the draft's 256-bit Master_Key, covering IPv4/IPv6,
+  covers/omits options, and all four
   packet types (SYN, SYN-ACK, non-SYN send, non-SYN recv)
 - Complete packet hex dumps with corrected 20-byte TCP-AO options (128-bit MACs)
-- Machine-readable JSON with all intermediate values (PRK, KDF inputs, MAC
-  message bytes, field boundaries) for cross-implementation debugging
+- A draft JSON containing only the Appendix outputs
+- A validation JSON containing intermediate values (PRK, KDF inputs, MAC message
+  bytes, and field boundaries) for cross-implementation debugging
 
 ## Requirements
 
@@ -42,11 +43,12 @@ This runs the full pipeline:
 
 1. Algorithm known-answer tests (RFC 5869, NIST KMAC samples, OpenSSL cross-check)
 2. RFC 9235 baseline validation (32/32 vectors for HMAC-SHA-1-96 and AES-128-CMAC-96)
-3. Test vector generation (64 vectors for the two new algorithms)
+3. Test vector generation (32 vectors for the two new algorithms)
 4. Verification (structural checks, checksums, Scapy cross-validation, MAC
    round-trip, directionality, matrix enforcement)
-5. RFC-formatted output of the conformant (256-bit key) vectors
-6. JSON output to `tcp_ao_test_vectors.json`
+5. RFC-formatted output of the draft vectors
+6. Draft output to `tcp_ao_draft_vectors.json` and detailed validation output to
+   `tcp_ao_test_vectors.json`
 
 ## Cross-validation against reference implementation (RFC 9235)
 
@@ -78,7 +80,8 @@ python3 cross_validate.py /path/to/tcp-authopt-test
 | `cross_validate.py` | Cross-validation against cdleonard/tcp-authopt-test |
 | `tcp_ao_new_algs_notes.md` | Assumptions and draft issues found |
 | `validation_methodology.md` | Verification methodology (9 steps) |
-| `tcp_ao_test_vectors.json` | Generated vectors with all intermediates |
+| `tcp_ao_draft_vectors.json` | Appendix outputs required by the draft |
+| `tcp_ao_test_vectors.json` | Generated vectors with validation intermediates |
 
 ## Draft issues documented
 
@@ -86,7 +89,6 @@ See [tcp_ao_new_algs_notes.md](tcp_ao_new_algs_notes.md) for issues found
 during implementation, including:
 
 - Appendix packets are structurally stale (12-byte MACs, wrong lengths/offsets)
-- Master key length conflict (80-bit key vs 256-bit MUST)
 - KMAC256-128 truncation wording (KMAC output length is not truncation)
 - Incorrect SP 800-185 reference in the HKDF section
 - Five-parameter KMAC expression needs explicit two-layer explanation

@@ -31,19 +31,7 @@ Therefore, the complete packet dumps need to be regenerated with TCP-AO Length
 updated. Replacing only the `TBD` Traffic_Key and MAC fields is insufficient
 because the packet dumps themselves contain the old 12-byte MAC values.
 
-### 2.2 Master key length conflict (nonconformant test vectors)
-
-**Draft §3**: "Master_Key MUST be at least 256 bits in length."
-**Appendix A**: "Input test vectors are as described in Section 3 of [RFC9235]."
-**RFC 9235 §3.1.1**: Master_Key = "testvector" (10 bytes = 80 bits).
-
-The 80-bit key is **nonconformant** with the draft's own normative requirement.
-
-**Our approach**: Generate both:
-- 32 provisional vectors using "testvector" (80-bit, for RFC 9235 continuity)
-- 32 candidate conformant vectors using "testvector-256-bit-key-tcp-ao!!!" (32 bytes ASCII)
-
-### 2.3 Scope truncation wording to HMAC-SHA256-128
+### 2.2 Scope truncation wording to HMAC-SHA256-128
 
 Remove the generic statement that all MACs are truncated. In Section 3.2.1, state:
 
@@ -53,13 +41,13 @@ Remove the generic statement that all MACs are truncated. In Section 3.2.1, stat
 KMAC256-128 uses its specified 128-bit output length; no truncation statement is
 needed.
 
-### 2.4 Incorrect HKDF reference (SP 800-185)
+### 2.3 Incorrect HKDF reference (SP 800-185)
 
 Section 3.1.1 states that HKDF-SHA256 is described in SP 800-185, SP 800-56Cr2,
 and RFC 5869. SP 800-185 does not define HKDF. Should we replace the sentence
 with: “HKDF-SHA256 is specified in [RFC5869].”
 
-### 2.5 Replace the five-parameter KMAC expression
+### 2.4 Replace the five-parameter KMAC expression
 
 There is no five-input KMAC256 operation. Replace Section 3.1.2 with:
 

@@ -49,7 +49,7 @@ from tcp_authopt_test.scapy_tcp_authopt import (
 )
 from tcp_ao_new_algs import (
     RFC9235_VECTORS,
-    MASTER_KEY_80,
+    RFC9235_MASTER_KEY,
     hex_to_bytes,
     parse_ipv4_packet,
     parse_ipv6_packet,
@@ -113,7 +113,7 @@ def cross_validate():
                 raise ValueError(f"Unexpected key_type: {key_type}")
 
             ref_ctx = build_context_from_packet(ref_pkt, ref_src_isn, ref_dst_isn)
-            ref_tk = ref_alg.kdf(MASTER_KEY_80, ref_ctx)
+            ref_tk = ref_alg.kdf(RFC9235_MASTER_KEY, ref_ctx)
             ref_msg = build_message_from_packet(ref_pkt, include_options=covers)
             ref_mac = ref_alg.mac(ref_tk, bytes(ref_msg))
 
@@ -126,7 +126,7 @@ def cross_validate():
 
             client_port = our_tcp['src_port'] if key_type.startswith('send') else our_tcp['dst_port']
             our_tk, our_ctx = derive_traffic_key(
-                kdf_fn, kdf_bits, MASTER_KEY_80, ip_ver,
+                kdf_fn, kdf_bits, RFC9235_MASTER_KEY, ip_ver,
                 client_port, pkt_info['client_isn'], pkt_info['server_isn'],
                 key_type
             )
