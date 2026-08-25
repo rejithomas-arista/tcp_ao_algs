@@ -13,12 +13,25 @@ which adds two new MAC/KDF algorithm pairs to TCP Authentication Option
 ## What this produces
 
 - **32 test vectors** using the draft's 256-bit Master_Key, covering IPv4/IPv6,
-  covers/omits options, and all four
-  packet types (SYN, SYN-ACK, non-SYN send, non-SYN recv)
+  covers/omits options, and all four packet types (SYN, SYN-ACK, non-SYN send,
+  non-SYN receive)
 - Complete packet hex dumps with corrected 20-byte TCP-AO options (128-bit MACs)
-- A draft JSON containing only the Appendix outputs
-- A validation JSON containing intermediate values (PRK, KDF inputs, MAC message
-  bytes, and field boundaries) for cross-implementation debugging
+- `tcp_ao_draft_vectors.json`, containing only the Traffic_Key, final packet,
+  and MAC outputs needed for Appendix A
+- `tcp_ao_test_vectors.json`, containing the same 32 vectors plus intermediate
+  values for validation and cross-implementation debugging
+
+## Master keys
+
+Draft vector generation uses only the 32-byte Master_Key specified by revision
+`-07`:
+
+```
+0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
+RFC 9235's 10-byte Master_Key, `"testvector"`, is used only to reproduce the
+RFC 9235 baseline vectors. It is not used in either generated JSON file.
 
 ## Requirements
 
@@ -91,5 +104,6 @@ during implementation, including:
 - Appendix packets are structurally stale (12-byte MACs, wrong lengths/offsets)
 - KMAC256-128 truncation wording (KMAC output length is not truncation)
 - Incorrect SP 800-185 reference in the HKDF section
-- Five-parameter KMAC expression needs explicit two-layer explanation
+- Five-parameter KMAC expression must be replaced with the standard
+  four-parameter KMAC256 interface
 - KMAC256-128 MAC customization string unspecified (we assume S="")
