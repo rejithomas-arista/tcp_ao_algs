@@ -1,72 +1,35 @@
 # TCP-AO New Algorithms: Assumptions, Clarifications & Draft Issues
 
-Reference: draft-ietf-tcpm-tcp-ao-algs-06
+Reference: draft-ietf-tcpm-tcp-ao-algs-07
 
 ## 1. Assumptions Made During Implementation
 
 ### 1.1 KMAC256-128 MAC customization string (S="")
 
-**Draft text**: Section 3.2 says "MAC_alg is KMAC256" but does not specify the
+**Draft text**: Section 3.2.2 says "MAC_alg is KMAC256" but does not specify the
 customization string S for the MAC operation (only the KDF specifies S="KDF").
 
-**Our assumption**: S="" (empty string), which is the SP 800-185 default when
-no customization is desired.
+**Assumption**: S="" (empty string), the SP 800-185 default when no customization
+is desired.
 
-**Rationale**: The draft specifies S explicitly for the KDF ("KDF", 0x4B 0x44 0x46)
-but is silent on S for the MAC. If a non-empty S were intended, it would have been
-stated, as it was for the KDF. An incorrect S produces entirely different output.
-
-**Risk**: If another implementor assumes S="TCP-AO" or any other value, interop
-will fail silently. The draft SHOULD state this explicitly.
-
-**Status**: Open — needs WG clarification.
-
-### 1.2 SYN-ACK uses "other" traffic keys, not "SYN" traffic keys
-
-**Draft text**: The draft inherits RFC 5925 Section 5.2 for traffic key assignment.
-
-**Our finding**: RFC 5925 defines "SYN segments" as "SYN set, ACK not set." SYN-ACK
-(SYN=1, ACK=1) is NOT a SYN segment and uses Send_other/Receive_other traffic keys,
-not Send_SYN/Receive_SYN. This is confirmed by RFC 9235 test vectors where the
-SYN-ACK traffic key equals the Receive_other traffic key (both ISNs present in context).
-
-**Verified against**: cdleonard/tcp-authopt-test reference implementation, which passes
-both ISNs (src_isn=server_ISN, dst_isn=client_ISN) for SYN-ACK test cases.
-
-### 1.3 KMAC256-KDF counter value
+### 1.2 KMAC256-KDF counter value
 
 **Draft text**: References SP 800-56Cr2, which uses a 4-byte big-endian counter
 starting at 0x00000001.
 
-**Our assumption**: Counter is always 0x00000001 because 256 bits ≤ KMAC256's
-maximum single-shot output, so only one iteration is needed.
-
-**Implementation**: `KMAC256(key=0^132, data=0x00000001||Master_Key||Context, mac_len=32, custom="KDF")`
+**Assumption**: Counter is 0x00000001 because the 256-bit output requires only one
+KMAC256 invocation.
 
 ## 2. Draft Issues Found
 
 ### 2.1 CRITICAL: Appendix packets are structurally stale
 
-All 32 appendix packet hex dumps are copied verbatim from RFC 9235 and still contain
-12-byte MAC fields (96-bit). The new algorithms produce 16-byte MACs (128-bit),
-requiring structural changes:
-
-| Field | Current (wrong) | Correct |
-|---|---|---|
-| TCP-AO Length | `0x10` (16 bytes) | `0x14` (20 bytes) |
-| SYN data offset | `0xe` (14 words) | `0xf` (15 words) |
-| Non-SYN data offset | `0xc` (12 words) | `0xd` (13 words) |
-| IPv4 Total Length | e.g., `0x004c` (76B) | +4 → `0x0050` (80B) |
-| IPv6 Payload Length | e.g., `0x0038` (56B) | +4 → `0x003c` (60B) |
-| IPv4 header checksum | old | must recompute |
-| TCP checksum | old | must recompute |
-| Embedded MAC bytes | 12B from RFC 9235 | 16B from new algorithms |
-
-**The complete packet dumps must be replaced, not merely the TBD fields.**
-
-Our implementation generates the corrected packets by mutating the RFC 9235 raw
-bytes: replacing the 16-byte TCP-AO option with 20 bytes, adjusting lengths and
-checksums, computing the new MAC, and recomputing the TCP checksum.
+Appendix A's packet dumps still encode TCP-AO Length `0x10` and a 12-byte MAC,
+as used by RFC 9235. The algorithms defined by this draft produce 16-byte MACs.
+Therefore, the complete packet dumps need to be regenerated with TCP-AO Length
+`0x14` and the corresponding packet lengths, TCP data offsets, and checksums
+updated. Replacing only the `TBD` Traffic_Key and MAC fields is insufficient
+because the packet dumps themselves contain the old 12-byte MAC values.
 
 ### 2.2 Master key length conflict (nonconformant test vectors)
 
@@ -80,62 +43,59 @@ The 80-bit key is **nonconformant** with the draft's own normative requirement.
 - 32 provisional vectors using "testvector" (80-bit, for RFC 9235 continuity)
 - 32 candidate conformant vectors using "testvector-256-bit-key-tcp-ao!!!" (32 bytes ASCII)
 
-### 2.3 KMAC256-128 truncation wording is misleading
+### 2.3 Scope truncation wording to HMAC-SHA256-128
 
-**Draft §3.2**: "All MACs are truncated to 128 bits."
+Remove the generic statement that all MACs are truncated. In Section 3.2.1, state:
 
-This is correct for HMAC-SHA256-128 (truncation = take leftmost 128 bits of a 256-bit
-output) but **misleading for KMAC256-128**. KMAC incorporates the requested output
-length L into its sponge padding:
+> The HMAC-SHA256 output is truncated to 128 bits. The first 128 bits are
+> preserved and subsequent bits are discarded.
 
-```
-KMAC256(..., L=128) ≠ KMAC256(..., L=256)[:16]
-```
-
-**Suggested replacement**:
-> - HMAC-SHA256-128: Compute HMAC-SHA256 and take the leftmost 128 bits.
-> - KMAC256-128: Request exactly 128 output bits from KMAC256 with an empty
->   customization string. Do not compute a longer output and truncate.
+KMAC256-128 uses its specified 128-bit output length; no truncation statement is
+needed.
 
 ### 2.4 Incorrect HKDF reference (SP 800-185)
 
-**Draft §3.1.1** cites SP 800-185 in the HKDF-SHA256 section. SP 800-185 defines
-SHA-3-derived functions (cSHAKE, KMAC, TupleHash, ParallelHash) and has nothing to
-do with HKDF. The reference should be RFC 5869 only.
+Section 3.1.1 states that HKDF-SHA256 is described in SP 800-185, SP 800-56Cr2,
+and RFC 5869. SP 800-185 does not define HKDF. Should we replace the sentence
+with: “HKDF-SHA256 is specified in [RFC5869].”
 
-### 2.5 Five-parameter KMAC expression needs explicit layering
+### 2.5 Replace the five-parameter KMAC expression
 
-**Draft §3.1.2** presents: `OKM = KMAC256(Z, salt, x, H_outputBits, S)`
+There is no five-input KMAC256 operation. Replace Section 3.1.2 with:
 
-There is no five-input KMAC operation. This is shorthand for two layers:
+```text
+3.1.2.  KMAC256-KDF
 
-**Layer 1 — SP 800-56Cr2 one-step KDF**:
+   KMAC256-KDF uses the one-step key-derivation function specified in
+   Section 4.1 of [DOI.10.6028_NIST.SP.800-56Cr2], with KMAC256 as the
+   auxiliary function, as described by Option 3.
+
+   The interface to KMAC256-KDF is:
+
+   *  OKM = KMAC256(salt, counter || Z || FixedInfo,
+                    H_outputBits, S)
+
+   where:
+
+   *  OKM is the Traffic_Key.
+
+   *  salt is an all-zero byte string whose length equals 132 bytes.
+
+   *  counter is the 32-bit integer 1, encoded in network byte order.
+
+   *  Z is the Master_Key argument provided to the KDF interface.
+
+   *  FixedInfo is the Context argument provided to the KDF interface.
+
+   *  H_outputBits is equal to 256 bits.
+
+   *  S is the byte string 01001011 || 01000100 || 01000110, which
+      represents the sequence of characters "K", "D", and "F" in
+      8-bit ASCII.
+
+   Because the required output length is equal to H_outputBits, only
+   one KMAC256 invocation is required.
 ```
-Z         = Master_Key
-salt      = 132 zero bytes
-FixedInfo = TCP-AO Context (RFC 5925 §5.2)
-message   = 0x00000001 || Z || FixedInfo
-```
-
-**Layer 2 — Standard KMAC256 (4 parameters)**:
-```
-Traffic_Key = KMAC256(
-    key           = salt (132 zero bytes),
-    message       = 0x00000001 || Master_Key || Context,
-    output_length = 256 bits,
-    customization = "KDF"
-)
-```
-
-Note: Master_Key appears in the KMAC *message*, not as the KMAC *key*. The all-zero
-salt serves as the KMAC key. This follows SP 800-56Cr2 Option 3 exactly.
-
-### 2.6 NIST KMAC test vector reference
-
-**Draft §7** (Security Considerations/References): SP 800-185 §4 defines KMAC but
-does not itself contain sample test vectors. The KMAC test vectors are published
-separately on NIST CSRC (KMACtestvectors/). The draft should reference the correct
-document for implementor validation.
 
 ## 3. Implementation Validation Summary
 
