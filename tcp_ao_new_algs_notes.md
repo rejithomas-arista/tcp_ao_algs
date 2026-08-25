@@ -96,38 +96,3 @@ There is no five-input KMAC256 operation. Replace Section 3.1.2 with:
    Because the required output length is equal to H_outputBits, only
    one KMAC256 invocation is required.
 ```
-
-## 3. Implementation Validation Summary
-
-| Check | Result |
-|---|---|
-| RFC 9235 baseline (32 vectors, 2 algorithms × 2 IP × 2 modes × 4 pkts) | 32/32 PASS |
-| Cross-validation vs cdleonard/tcp-authopt-test (context, TK, MAC msg, MAC) | 32/32 MATCH |
-| HKDF-SHA256 vs RFC 5869 Test Case 1 | PASS |
-| HKDF-SHA256 vs OpenSSL `kdf` command | PASS |
-| KMAC256 vs NIST CSRC Samples #4, #5, #6 | PASS |
-| KMAC output-length dependence (L=128 ≠ L=256[:16]) | Confirmed |
-| Packet structure (IPv4/IPv6 lengths, data offset, AO Length=20) | All OK |
-| IPv4 header checksums | All OK |
-| TCP checksums (independent recomputation) | All OK |
-| Scapy cross-validation (delete + re-serialize checksums) | All OK |
-| MAC round-trip (parse final packet → recompute MAC → verify) | All OK |
-| Matrix enforcement (32 per key variant, 64 total unique tuples) | OK |
-
-## 4. Files
-
-| File | Purpose |
-|---|---|
-| `tcp_ao_new_algs.py` | Implementation, generation, verification |
-| `tcp_ao_new_algs_plan.md` | Detailed implementation plan |
-| `tcp_ao_new_algs_notes.md` | This document |
-| `tcp_ao_test_vectors.json` | Machine-readable output (64 vectors + intermediates) |
-| `cross_validate.py` | Cross-validation against cdleonard/tcp-authopt-test |
-
-## 5. Environment
-
-- Python 3.9.21
-- pycryptodome 3.23.0
-- scapy 2.7.0
-- OpenSSL 3.2.2
-- Reference impl: cdleonard/tcp-authopt-test
